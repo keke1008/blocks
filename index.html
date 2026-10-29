@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0b0e14" />
+    <meta name="description" content="A falling block puzzle for one player, made for landscape phones." />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/icon-192.png" />
+    <title>Blocks</title>
+  </head>
+  <body>
+    <canvas id="board"></canvas>
+
+    <div id="controls" aria-hidden="true"></div>
+
+    <button id="pause-btn" class="icon-btn" aria-label="Pause">
+      <svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+    </button>
+
+    <section id="menu" class="overlay">
+      <h1>BLOCKS</h1>
+      <p class="sub">Marathon · 150 lines</p>
+      <button data-action="start" class="primary">Start</button>
+      <button data-action="settings">Settings</button>
+      <p class="best">Best: <span id="menu-best">0</span></p>
+    </section>
+
+    <section id="pause" class="overlay" hidden>
+      <h2>Paused</h2>
+      <button data-action="resume" class="primary">Resume</button>
+      <button data-action="restart">Restart</button>
+      <button data-action="settings">Settings</button>
+      <button data-action="quit">Quit</button>
+    </section>
+
+    <section id="over" class="overlay" hidden>
+      <h2 id="over-title">Game Over</h2>
+      <p class="score">Score <span id="over-score">0</span></p>
+      <p class="best" id="over-best"></p>
+      <button data-action="restart" class="primary">Play Again</button>
+      <button data-action="quit">Menu</button>
+    </section>
+
+    <section id="settings" class="overlay panel" hidden>
+      <h2>Settings</h2>
+      <div class="rows">
+        <label class="row">
+          <span>DAS <small>delay before auto-repeat</small></span>
+          <input type="range" id="set-das" min="0" max="400" step="5" />
+          <output id="out-das"></output>
+        </label>
+        <label class="row">
+          <span>ARR <small>auto-repeat interval (0 = instant)</small></span>
+          <input type="range" id="set-arr" min="0" max="100" step="1" />
+          <output id="out-arr"></output>
+        </label>
+        <label class="row">
+          <span>Soft drop speed</span>
+          <select id="set-sdf">
+            <option value="5">5×</option>
+            <option value="10">10×</option>
+            <option value="20">20×</option>
+            <option value="40">40×</option>
+            <option value="0">Instant</option>
+          </select>
+        </label>
+        <label class="row">
+          <span>Next pieces</span>
+          <input type="range" id="set-next" min="1" max="6" step="1" />
+          <output id="out-next"></output>
+        </label>
+        <label class="row">
+          <span>Ghost piece</span>
+          <input type="checkbox" id="set-ghost" />
+        </label>
+      </div>
+      <div class="buttons">
+        <button data-action="layout">Edit Buttons</button>
+        <button data-action="reset-settings">Reset</button>
+        <button data-action="back" class="primary">Back</button>
+      </div>
+    </section>
+
+    <section id="layout-bar" hidden>
+      <span id="layout-hint">Drag a button to move it. Tap to select.</span>
+      <label>Size <input type="range" id="layout-size" min="40" max="160" step="2" /></label>
+      <button data-action="layout-reset">Reset</button>
+      <button data-action="layout-done" class="primary">Done</button>
+    </section>
+
+    <div id="rotate">
+      <svg viewBox="0 0 24 24"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm0 3v14h10V5z" /></svg>
+      <p>Rotate your device to landscape</p>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
