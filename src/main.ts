@@ -2,6 +2,7 @@ import './style.css';
 import { Game } from './game/game';
 import { InputController } from './input';
 import { Renderer } from './render';
+import { LayoutDrag, TouchRouter, nearestAction, type ControlEvent, type Viewport } from './touch';
 import {
   ACTIONS,
   defaultButtons,
@@ -51,12 +52,11 @@ const LABELS: Record<Action, string> = {
 };
 
 const buttonEls = {} as Record<Action, HTMLElement>;
-const pointerAction = new Map<number, Action>();
 let selected: Action = 'rotR';
-let drag: { id: number; action: Action; dx: number; dy: number } | null = null;
 
-/** Actions a finger may slide between while held (like a D-pad). */
-const SLIDE_ACTIONS: readonly Action[] = ['left', 'right', 'soft'];
+const viewport = (): Viewport => ({ width: window.innerWidth, height: window.innerHeight });
+const touches = new TouchRouter(() => settings.buttons, viewport);
+const layoutDrag = new LayoutDrag(() => settings.buttons, viewport);
 
 function placeButtons(): void {
   for (const a of ACTIONS) {
@@ -83,14 +83,15 @@ const ZONE_COLORS: Record<Action, string> = {
 function drawZones(): void {
   const canvas = $<HTMLCanvasElement>('#zones');
   const step = 8;
-  const w = Math.ceil(window.innerWidth / step);
-  const h = Math.ceil(window.innerHeight / step);
+  const view = viewport();
+  const w = Math.ceil(view.width / step);
+  const h = Math.ceil(view.height / step);
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d')!;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      ctx.fillStyle = ZONE_COLORS[nearestAction((x + 0.5) * step, (y + 0.5) * step)];
+      ctx.fillStyle = ZONE_COLORS[nearestAction(settings.buttons, view, (x + 0.5) * step, (y + 0.5) * step)];
       ctx.fillRect(x, y, 1, 1);
     }
   }
@@ -117,93 +118,44 @@ function buildControls(): void {
   placeButtons();
 }
 
-/** The action whose marker is closest to the touch. */
-function nearestAction(x: number, y: number): Action {
-  let best: Action = ACTIONS[0];
-  let bestDist = Infinity;
-  for (const a of ACTIONS) {
-    const b = settings.buttons[a];
-    const d = Math.hypot(x - b.x * window.innerWidth, y - b.y * window.innerHeight);
-    if (d < bestDist) {
-      bestDist = d;
-      best = a;
-    }
-  }
-  return best;
-}
-
 function onPointerDown(e: PointerEvent): void {
   e.preventDefault();
-  const action = nearestAction(e.clientX, e.clientY);
   if (editing) {
-    const b = settings.buttons[action];
-    selected = action;
-    drag = {
-      id: e.pointerId,
-      action,
-      dx: e.clientX - b.x * window.innerWidth,
-      dy: e.clientY - b.y * window.innerHeight,
-    };
+    selected = layoutDrag.start(e.pointerId, e.clientX, e.clientY);
     syncLayoutBar();
     placeButtons();
     return;
   }
-  pressPointer(e.pointerId, action);
+  apply(touches.down(e.pointerId, e.clientX, e.clientY));
 }
 
 function onPointerMove(e: PointerEvent): void {
-  if (drag) {
-    if (drag.id !== e.pointerId) return;
-    const b = settings.buttons[drag.action];
-    b.x = clamp01((e.clientX - drag.dx) / window.innerWidth);
-    b.y = clamp01((e.clientY - drag.dy) / window.innerHeight);
+  if (layoutDrag.move(e.pointerId, e.clientX, e.clientY)) {
     placeButtons();
     return;
   }
-  // A held movement finger can slide to the neighbouring movement action.
-  // Other actions fire once on touch and never trigger by sliding into them.
-  const current = pointerAction.get(e.pointerId);
-  if (!current || !SLIDE_ACTIONS.includes(current)) return;
-  const next = nearestAction(e.clientX, e.clientY);
-  if (next !== current && SLIDE_ACTIONS.includes(next)) {
-    releasePointer(e.pointerId);
-    pressPointer(e.pointerId, next);
-  }
+  apply(touches.move(e.pointerId, e.clientX, e.clientY));
 }
 
 function onPointerUp(e: PointerEvent): void {
-  if (drag && drag.id === e.pointerId) {
-    drag = null;
+  if (layoutDrag.end(e.pointerId)) {
     saveSettings(settings);
     return;
   }
-  releasePointer(e.pointerId);
+  apply(touches.up(e.pointerId));
 }
 
-function pressPointer(id: number, action: Action): void {
-  pointerAction.set(id, action);
-  buttonEls[action].classList.add('down');
-  input.press(action);
-}
-
-function releasePointer(id: number): void {
-  const action = pointerAction.get(id);
-  if (!action) return;
-  pointerAction.delete(id);
-  // Another finger may still be holding the same action.
-  if ([...pointerAction.values()].includes(action)) return;
-  buttonEls[action].classList.remove('down');
-  input.release(action);
+function apply(events: ControlEvent[]): void {
+  for (const { type, action } of events) {
+    buttonEls[action].classList.toggle('down', type === 'press');
+    if (type === 'press') input.press(action);
+    else input.release(action);
+  }
 }
 
 function releaseAllButtons(): void {
-  pointerAction.clear();
-  for (const a of ACTIONS) buttonEls[a].classList.remove('down');
+  apply(touches.releaseAll());
   input.releaseAll();
-}
-
-function clamp01(v: number): number {
-  return Math.min(1, Math.max(0, v));
 }
 
 // ------------------------------------------------------------------ screens
