@@ -351,7 +351,7 @@ function frame(now: number): void {
   const dt = Math.min(now - last, 100);
   last = now;
   if (screen === 'playing' && game) {
-    game.softDropFactor = settings.sdf === 0 ? Infinity : settings.sdf;
+    game.setSoftDropFactor(settings.sdf === 0 ? Infinity : settings.sdf);
     input.update(dt);
     game.update(dt);
     if (game.status !== 'playing') finish(game);

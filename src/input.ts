@@ -28,7 +28,7 @@ export class InputController {
         this.startShift(action === 'left' ? -1 : 1);
         break;
       case 'soft':
-        game.softDropping = true;
+        game.setSoftDrop(true);
         break;
       case 'hard':
         game.hardDrop();
@@ -48,7 +48,7 @@ export class InputController {
   release(action: Action): void {
     if (!this.held.delete(action)) return;
     const game = this.getGame();
-    if (action === 'soft' && game) game.softDropping = false;
+    if (action === 'soft' && game) game.setSoftDrop(false);
     if ((action === 'left' && this.dir === -1) || (action === 'right' && this.dir === 1)) {
       // Fall back to the other direction if it is still held.
       const other = action === 'left' ? 'right' : 'left';

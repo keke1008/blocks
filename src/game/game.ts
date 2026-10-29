@@ -15,6 +15,7 @@ export const MARATHON_LINES = 150;
 
 export type BoardCell = PieceType | null;
 export type Board = BoardCell[][];
+export type ReadonlyBoard = readonly (readonly BoardCell[])[];
 
 export interface ActivePiece {
   type: PieceType;
@@ -36,6 +37,25 @@ export interface GameOptions {
   rng?: Rng;
   /** Soft drop gravity multiplier. Infinity drops to the floor instantly. */
   softDropFactor?: number;
+  /** Starting board (copied). For tests and puzzles. */
+  board?: ReadonlyBoard;
+  /** Place this piece instead of spawning from the queue. For tests and puzzles. */
+  piece?: ActivePiece;
+}
+
+/**
+ * Builds a board from text rows aligned to the bottom of the field:
+ * '.' is empty, any other character is a filled cell.
+ */
+export function boardFromRows(rows: readonly string[]): Board {
+  const board = emptyBoard();
+  rows.forEach((row, i) => {
+    const y = HEIGHT - rows.length + i;
+    [...row].forEach((ch, x) => {
+      if (ch !== '.') board[y][x] = 'Z';
+    });
+  });
+  return board;
 }
 
 /** Guideline gravity: seconds per row = (0.8 - (level - 1) * 0.007) ^ (level - 1). */
@@ -49,8 +69,10 @@ export function emptyBoard(): Board {
 }
 
 export class Game {
-  board: Board = emptyBoard();
-  active: ActivePiece | null = null;
+  private _board: Board;
+  private _active: ActivePiece | null = null;
+  /** Increments every time a new piece enters play (spawn, hold swap or fixture). */
+  pieceCount = 0;
   hold: PieceType | null = null;
   holdUsed = false;
   queue: PieceType[] = [];
@@ -64,8 +86,8 @@ export class Game {
   lastClear: ClearEvent | null = null;
   time = 0;
 
-  softDropping = false;
-  softDropFactor: number;
+  private _softDrop = false;
+  private softDropFactor: number;
 
   private bag: Bag;
   /** Progress toward the next gravity step, in rows (kept speed-independent). */
@@ -79,8 +101,38 @@ export class Game {
   constructor(options: GameOptions = {}) {
     this.bag = new Bag(options.rng);
     this.softDropFactor = options.softDropFactor ?? 20;
+    this._board = options.board ? options.board.map((row) => [...row]) : emptyBoard();
     while (this.queue.length < QUEUE_SIZE) this.queue.push(this.bag.next());
-    this.spawn(this.takeNext());
+    if (options.piece) {
+      this._active = { ...options.piece };
+      this.lowestY = options.piece.y;
+      this.pieceCount++;
+    } else {
+      this.spawn(this.takeNext());
+    }
+  }
+
+  get board(): ReadonlyBoard {
+    return this._board;
+  }
+
+  get active(): Readonly<ActivePiece> | null {
+    return this._active;
+  }
+
+  get softDropping(): boolean {
+    return this._softDrop;
+  }
+
+  // ---------------------------------------------------------------- input
+
+  setSoftDrop(on: boolean): void {
+    this._softDrop = on;
+  }
+
+  /** Soft drop gravity multiplier. Infinity drops to the floor instantly. */
+  setSoftDropFactor(factor: number): void {
+    this.softDropFactor = factor;
   }
 
   // ---------------------------------------------------------------- queries
@@ -90,21 +142,21 @@ export class Game {
       const bx = x + cx;
       const by = y + cy;
       if (bx < 0 || bx >= WIDTH || by < 0 || by >= HEIGHT) return true;
-      if (this.board[by][bx] !== null) return true;
+      if (this._board[by][bx] !== null) return true;
     }
     return false;
   }
 
   /** Board cells occupied by the active piece. */
   activeCells(): Cell[] {
-    const p = this.active;
+    const p = this._active;
     if (!p) return [];
     return pieceCells(p.type, p.rot).map(([cx, cy]) => [p.x + cx, p.y + cy] as const);
   }
 
   /** y position where the active piece would land. */
   ghostY(): number {
-    const p = this.active;
+    const p = this._active;
     if (!p) return 0;
     let y = p.y;
     while (!this.collides(p.type, p.rot, p.x, y + 1)) y++;
@@ -112,7 +164,7 @@ export class Game {
   }
 
   isGrounded(): boolean {
-    const p = this.active;
+    const p = this._active;
     return !!p && this.collides(p.type, p.rot, p.x, p.y + 1);
   }
 
@@ -128,7 +180,7 @@ export class Game {
 
   /** Rotate clockwise (dir = 1) or counter-clockwise (dir = -1) using SRS kicks. */
   rotate(dir: 1 | -1): boolean {
-    const p = this.active;
+    const p = this._active;
     if (!p || this.status !== 'playing') return false;
     const to = (((p.rot + dir) % 4) + 4) % 4 as Rotation;
     const kicks = getKicks(p.type, p.rot, to);
@@ -148,7 +200,7 @@ export class Game {
   }
 
   hardDrop(): void {
-    const p = this.active;
+    const p = this._active;
     if (!p || this.status !== 'playing') return;
     const y = this.ghostY();
     if (y > p.y) {
@@ -160,7 +212,7 @@ export class Game {
   }
 
   holdPiece(): boolean {
-    const p = this.active;
+    const p = this._active;
     if (!p || this.holdUsed || this.status !== 'playing') return false;
     const next = this.hold ?? this.takeNext();
     this.hold = p.type;
@@ -171,7 +223,7 @@ export class Game {
 
   /** Advance the game by `dt` milliseconds (gravity, soft drop and lock delay). */
   update(dt: number): void {
-    if (this.status !== 'playing' || !this.active) return;
+    if (this.status !== 'playing' || !this._active) return;
     this.time += dt;
 
     const base = gravityMs(this.level);
@@ -205,7 +257,7 @@ export class Game {
   // ---------------------------------------------------------------- internals
 
   private shift(dx: number): boolean {
-    const p = this.active;
+    const p = this._active;
     if (!p || this.status !== 'playing') return false;
     if (this.collides(p.type, p.rot, p.x + dx, p.y)) return false;
     p.x += dx;
@@ -215,7 +267,7 @@ export class Game {
   }
 
   private dropRows(rows: number, soft: boolean): void {
-    const p = this.active!;
+    const p = this._active!;
     let moved = 0;
     while (moved < rows && !this.collides(p.type, p.rot, p.x, p.y + 1)) {
       p.y++;
@@ -241,7 +293,7 @@ export class Game {
 
   /** Reaching a new lowest row refreshes the move-reset counter. */
   private onDescend(): void {
-    const p = this.active!;
+    const p = this._active!;
     if (p.y > this.lowestY) {
       this.lowestY = p.y;
       this.lockResets = 0;
@@ -266,19 +318,20 @@ export class Game {
     this.lastKickIndex = 0;
     if (this.collides(type, 0, x, y)) {
       // Block out.
-      this.active = { type, rot: 0, x, y };
+      this._active = { type, rot: 0, x, y };
       this.status = 'gameover';
       return;
     }
-    this.active = { type, rot: 0, x, y };
+    this._active = { type, rot: 0, x, y };
+    this.pieceCount++;
     // Guideline: drop one row immediately if nothing is in the way.
-    if (!this.collides(type, 0, x, y + 1)) this.active.y++;
-    this.lowestY = this.active.y;
+    if (!this.collides(type, 0, x, y + 1)) this._active.y++;
+    this.lowestY = this._active.y;
   }
 
   /** 3-corner T-spin detection. Must be called before the piece is merged. */
   detectTSpin(): TSpin {
-    const p = this.active;
+    const p = this._active;
     if (!p || p.type !== 'T' || !this.lastMoveRotation) return 'none';
     const corners: Cell[] = [[0, 0], [2, 0], [2, 2], [0, 2]];
     const filled = corners.map(([cx, cy]) => this.isBlocked(p.x + cx, p.y + cy));
@@ -294,16 +347,16 @@ export class Game {
 
   private isBlocked(x: number, y: number): boolean {
     if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT) return true;
-    return this.board[y][x] !== null;
+    return this._board[y][x] !== null;
   }
 
   private lock(): void {
-    const p = this.active;
+    const p = this._active;
     if (!p) return;
     const tspin = this.detectTSpin();
     const cells = this.activeCells();
-    for (const [x, y] of cells) this.board[y][x] = p.type;
-    this.active = null;
+    for (const [x, y] of cells) this._board[y][x] = p.type;
+    this._active = null;
 
     // Lock out: the whole piece is above the visible field.
     if (cells.every(([, y]) => y < BUFFER_HEIGHT)) {
@@ -312,7 +365,7 @@ export class Game {
     }
 
     const cleared = this.clearLines();
-    const perfectClear = cleared > 0 && this.board.every((row) => row.every((c) => c === null));
+    const perfectClear = cleared > 0 && this._board.every((row) => row.every((c) => c === null));
     const result = scoreClear({
       lines: cleared,
       tspin,
@@ -342,10 +395,10 @@ export class Game {
   }
 
   private clearLines(): number {
-    const remaining = this.board.filter((row) => row.some((c) => c === null));
+    const remaining = this._board.filter((row) => row.some((c) => c === null));
     const cleared = HEIGHT - remaining.length;
     while (remaining.length < HEIGHT) remaining.unshift(Array<BoardCell>(WIDTH).fill(null));
-    this.board = remaining;
+    this._board = remaining;
     return cleared;
   }
 }
