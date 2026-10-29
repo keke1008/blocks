@@ -1,21 +1,19 @@
-name: Deploy to GitHub Pages
+name: Test and deploy
 
 on:
   push:
-    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: test-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,19 +22,41 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test
-      - run: npm run build
-      - uses: actions/configure-pages@v5
+      - name: Unit tests
+        run: npm test
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+      - name: Browser tests
+        run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results
+          path: test-results
+          retention-days: 7
+      # Fresh build for deploy (the browser tests modify dist/ while running).
+      - name: Build
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: npm run build
       - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:
           path: dist
 
   deploy:
-    needs: build
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/configure-pages@v5
       - id: deployment
         uses: actions/deploy-pages@v4

@@ -103,6 +103,7 @@ function buildControls(): void {
   for (const a of ACTIONS) {
     const el = document.createElement('div');
     el.className = 'ctl';
+    el.dataset.control = a;
     el.innerHTML = ICONS[a];
     root.appendChild(el);
     buttonEls[a] = el;
@@ -358,6 +359,11 @@ function frame(now: number): void {
   }
   renderer.draw(game, { ghost: settings.ghost, nextCount: settings.nextCount, best });
   requestAnimationFrame(frame);
+}
+
+// Read-only window into the game for the browser tests (tests/e2e).
+if (new URLSearchParams(location.search).has('e2e')) {
+  Object.assign(window, { __blocks: { game: () => game, screen: () => screen } });
 }
 
 buildControls();
