@@ -87,6 +87,17 @@ describe('game', () => {
     expect(resets).toBe(15);
   });
 
+  it('does not jump several rows when soft drop starts mid-fall', () => {
+    const game = new Game({ rng: seeded(3), softDropFactor: 20 });
+    game.board = emptyBoard();
+    withActive(game, 'T', 0, 3, 25);
+    game.update(900); // just under one row at level 1
+    expect(game.active!.y).toBe(25);
+    game.softDropping = true;
+    game.update(16);
+    expect(game.active!.y).toBeLessThanOrEqual(26);
+  });
+
   it('holds once per piece', () => {
     const game = new Game({ rng: seeded(3) });
     const first = game.active!.type;

@@ -1,12 +1,19 @@
-// Offline cache: network-first for pages (so updates arrive), cache-first for
-// everything else (built assets have hashed names).
-const CACHE = 'blocks-v1';
-const CORE = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
+// Service worker template. The build (vite.config.ts) fills in VERSION and
+// PRECACHE, so every release ships a different sw.js and the browser notices it.
+const VERSION = '__VERSION__';
+const PRECACHE = __PRECACHE__;
+const CACHE = `blocks-${VERSION}`;
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE)).then(() => self.skipWaiting()));
+  event.waitUntil(
+    caches
+      .open(CACHE)
+      .then((c) => c.addAll(PRECACHE.map((url) => new Request(url, { cache: 'reload' }))))
+      .then(() => self.skipWaiting()),
+  );
 });
 
+// Drop caches from older releases.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
@@ -20,12 +27,15 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
 
+  // Pages: network first (revalidated, so a new release shows up), cache when offline.
   if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req)
+      fetch(req, { cache: 'no-cache' })
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put('./index.html', copy));
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put('./index.html', copy));
+          }
           return res;
         })
         .catch(() => caches.match('./index.html')),
@@ -33,6 +43,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Assets have hashed names, so cache first is safe.
   event.respondWith(
     caches.match(req).then(
       (hit) =>

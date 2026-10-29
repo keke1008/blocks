@@ -68,6 +68,7 @@ export class Game {
   softDropFactor: number;
 
   private bag: Bag;
+  /** Progress toward the next gravity step, in rows (kept speed-independent). */
   private gravityAcc = 0;
   private lockTimer = 0;
   private lockResets = 0;
@@ -181,10 +182,12 @@ export class Game {
     } else if (interval <= 0) {
       this.dropRows(Infinity, true);
     } else {
-      this.gravityAcc += dt;
-      const rows = Math.floor(this.gravityAcc / interval);
+      // Tracked in rows rather than ms so switching soft drop on mid-fall
+      // does not cash in the time already spent at normal speed.
+      this.gravityAcc += dt / interval;
+      const rows = Math.floor(this.gravityAcc);
       if (rows > 0) {
-        this.gravityAcc -= rows * interval;
+        this.gravityAcc -= rows;
         this.dropRows(rows, this.softDropping);
       }
     }

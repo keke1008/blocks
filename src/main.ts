@@ -109,6 +109,9 @@ function buildControls(): void {
     buttonEls[a] = el;
   }
   root.addEventListener('pointerdown', onPointerDown);
+  // Cancelling touchstart stops Android's long-press handling (and its haptic
+  // buzz); pointer events still arrive.
+  root.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
   // Move/up/cancel are tracked on window so a finger that slides anywhere still releases.
   window.addEventListener('pointerup', onPointerUp);
   window.addEventListener('pointercancel', onPointerUp);
@@ -231,6 +234,7 @@ function setScreen(s: Screen): void {
   } else {
     showOverlay(null);
   }
+  syncUpdateBanner();
 }
 
 function startGame(): void {
@@ -373,9 +377,13 @@ document.addEventListener('click', (e) => {
     case 'layout-done':
       setEditing(false);
       break;
+    case 'reload':
+      location.reload();
+      break;
   }
 });
 
+$('#pause-btn').addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
 $('#pause-btn').addEventListener('pointerdown', (e) => {
   e.preventDefault();
   pause();
@@ -418,8 +426,35 @@ renderer.resize();
 setScreen('menu');
 requestAnimationFrame(frame);
 
+// ------------------------------------------------------------------ updates
+
+let updateReady = false;
+
+/** The update banner never covers the field mid-game; it waits for a pause or menu. */
+function syncUpdateBanner(): void {
+  $('#update').hidden = !updateReady || screen === 'playing';
+}
+
+async function setupServiceWorker(): Promise<void> {
+  const sw = navigator.serviceWorker;
+  // A page that was already controlled is running the old release when a new
+  // worker takes over; a first install is not an update.
+  const hadController = !!sw.controller;
+  sw.addEventListener('controllerchange', () => {
+    if (!hadController) return;
+    updateReady = true;
+    syncUpdateBanner();
+  });
+  const reg = await sw.register('./sw.js', { updateViaCache: 'none' });
+  const check = () => reg.update().catch(() => {});
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) check();
+  });
+  setInterval(check, 30 * 60 * 1000);
+}
+
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  navigator.serviceWorker.register('./sw.js').catch(() => {
+  setupServiceWorker().catch(() => {
     // Offline support is optional.
   });
 }
