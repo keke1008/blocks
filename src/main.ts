@@ -50,10 +50,13 @@ const LABELS: Record<Action, string> = {
   hold: 'Hold',
 };
 
-const buttonEls = {} as Record<Action, HTMLButtonElement>;
+const buttonEls = {} as Record<Action, HTMLElement>;
 const pointerAction = new Map<number, Action>();
 let selected: Action = 'rotR';
 let drag: { id: number; action: Action; dx: number; dy: number } | null = null;
+
+/** Actions a finger may slide between while held (like a D-pad). */
+const SLIDE_ACTIONS: readonly Action[] = ['left', 'right', 'soft'];
 
 function placeButtons(): void {
   for (const a of ACTIONS) {
@@ -65,29 +68,75 @@ function placeButtons(): void {
     el.style.fontSize = `${Math.round(b.size * 0.2)}px`;
     el.classList.toggle('selected', editing && a === selected);
   }
+  if (editing) drawZones();
+}
+
+const ZONE_COLORS: Record<Action, string> = {
+  left: '#4c8dff',
+  right: '#31c7ef',
+  soft: '#42b642',
+  hard: '#ef7921',
+  rotL: '#ad4d9c',
+  rotR: '#ef2029',
+  hold: '#f7d308',
+};
+
+/** Shades the screen by which action a touch there would trigger (editor only). */
+function drawZones(): void {
+  const canvas = $<HTMLCanvasElement>('#zones');
+  const step = 8;
+  const w = Math.ceil(window.innerWidth / step);
+  const h = Math.ceil(window.innerHeight / step);
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d')!;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      ctx.fillStyle = ZONE_COLORS[nearestAction((x + 0.5) * step, (y + 0.5) * step)];
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
 }
 
 function buildControls(): void {
+  // The whole screen is one touch surface; markers only show where each action sits.
   const root = $('#controls');
   for (const a of ACTIONS) {
-    const el = document.createElement('button');
+    const el = document.createElement('div');
     el.className = 'ctl';
     el.innerHTML = ICONS[a];
-    el.setAttribute('aria-label', LABELS[a]);
-    el.addEventListener('pointerdown', (e) => onButtonDown(e, a));
-    el.addEventListener('contextmenu', (e) => e.preventDefault());
     root.appendChild(el);
     buttonEls[a] = el;
   }
-  // Up/cancel are tracked on window so a finger that slides off still releases.
+  root.addEventListener('pointerdown', onPointerDown);
+  // Move/up/cancel are tracked on window so a finger that slides anywhere still releases.
   window.addEventListener('pointerup', onPointerUp);
   window.addEventListener('pointercancel', onPointerUp);
   window.addEventListener('pointermove', onPointerMove);
   placeButtons();
 }
 
-function onButtonDown(e: PointerEvent, action: Action): void {
+/**
+ * The action whose marker is closest to the touch. Distance is scaled by the
+ * marker radius so larger markers own a larger share of the screen.
+ */
+function nearestAction(x: number, y: number): Action {
+  let best: Action = ACTIONS[0];
+  let bestDist = Infinity;
+  for (const a of ACTIONS) {
+    const b = settings.buttons[a];
+    const d = Math.hypot(x - b.x * window.innerWidth, y - b.y * window.innerHeight) / (b.size / 2);
+    if (d < bestDist) {
+      bestDist = d;
+      best = a;
+    }
+  }
+  return best;
+}
+
+function onPointerDown(e: PointerEvent): void {
   e.preventDefault();
+  const action = nearestAction(e.clientX, e.clientY);
   if (editing) {
     const b = settings.buttons[action];
     selected = action;
@@ -101,17 +150,27 @@ function onButtonDown(e: PointerEvent, action: Action): void {
     placeButtons();
     return;
   }
-  pointerAction.set(e.pointerId, action);
-  buttonEls[action].classList.add('down');
-  input.press(action);
+  pressPointer(e.pointerId, action);
 }
 
 function onPointerMove(e: PointerEvent): void {
-  if (!drag || drag.id !== e.pointerId) return;
-  const b = settings.buttons[drag.action];
-  b.x = clamp01((e.clientX - drag.dx) / window.innerWidth);
-  b.y = clamp01((e.clientY - drag.dy) / window.innerHeight);
-  placeButtons();
+  if (drag) {
+    if (drag.id !== e.pointerId) return;
+    const b = settings.buttons[drag.action];
+    b.x = clamp01((e.clientX - drag.dx) / window.innerWidth);
+    b.y = clamp01((e.clientY - drag.dy) / window.innerHeight);
+    placeButtons();
+    return;
+  }
+  // A held movement finger can slide to the neighbouring movement action.
+  // Other actions fire once on touch and never trigger by sliding into them.
+  const current = pointerAction.get(e.pointerId);
+  if (!current || !SLIDE_ACTIONS.includes(current)) return;
+  const next = nearestAction(e.clientX, e.clientY);
+  if (next !== current && SLIDE_ACTIONS.includes(next)) {
+    releasePointer(e.pointerId);
+    pressPointer(e.pointerId, next);
+  }
 }
 
 function onPointerUp(e: PointerEvent): void {
@@ -120,10 +179,20 @@ function onPointerUp(e: PointerEvent): void {
     saveSettings(settings);
     return;
   }
-  const action = pointerAction.get(e.pointerId);
+  releasePointer(e.pointerId);
+}
+
+function pressPointer(id: number, action: Action): void {
+  pointerAction.set(id, action);
+  buttonEls[action].classList.add('down');
+  input.press(action);
+}
+
+function releasePointer(id: number): void {
+  const action = pointerAction.get(id);
   if (!action) return;
-  pointerAction.delete(e.pointerId);
-  // Another finger may still be holding the same button.
+  pointerAction.delete(id);
+  // Another finger may still be holding the same action.
   if ([...pointerAction.values()].includes(action)) return;
   buttonEls[action].classList.remove('down');
   input.release(action);
@@ -322,7 +391,10 @@ portrait.addEventListener('change', () => {
   if (portrait.matches) pause();
 });
 
-window.addEventListener('resize', () => renderer.resize());
+window.addEventListener('resize', () => {
+  renderer.resize();
+  placeButtons();
+});
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // ------------------------------------------------------------------ loop

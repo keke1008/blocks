@@ -13,8 +13,13 @@ A single-player falling block puzzle for Android phones in landscape.
 ## Controls (touch, two hands)
 - Left hand: D-pad — Left, Right, Soft drop (down), Hard drop (up).
 - Right hand: Rotate left, Rotate right, Hold.
-- Multi-touch: buttons can be held simultaneously (e.g. hold Left while rotating).
-- Each button's position and size can be adjusted in the button editor. No gestures.
+- The whole screen is the touch surface: a touch triggers the action whose marker is
+  nearest (distance scaled by marker size), so you never have to hit a button exactly.
+- A finger holding Left / Right / Soft drop can slide between those three, like a D-pad.
+  Hard drop, rotations and Hold only fire on touch, never by sliding into them.
+- Multi-touch: several fingers can act at once (e.g. hold Left while rotating).
+- Each marker's position and size can be adjusted in the button editor, which shades
+  the screen by which action each area triggers. No gestures.
 - DAS / ARR auto-repeat, adjustable in settings.
 
 ## Rules

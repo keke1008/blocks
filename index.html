@@ -15,7 +15,7 @@
   <body>
     <canvas id="board"></canvas>
 
-    <div id="controls" aria-hidden="true"></div>
+    <div id="controls" aria-hidden="true"><canvas id="zones"></canvas></div>
 
     <button id="pause-btn" class="icon-btn" aria-label="Pause">
       <svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
@@ -86,7 +86,7 @@
     </section>
 
     <section id="layout-bar" hidden>
-      <span id="layout-hint">Drag a button to move it. Tap to select.</span>
+      <span id="layout-hint">Touch near a marker and drag to move it.</span>
       <label>Size <input type="range" id="layout-size" min="40" max="160" step="2" /></label>
       <button data-action="layout-reset">Reset</button>
       <button data-action="layout-done" class="primary">Done</button>

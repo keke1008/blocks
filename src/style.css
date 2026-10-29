@@ -39,7 +39,22 @@ body {
 #controls {
   position: fixed;
   inset: 0;
+  touch-action: none;
+}
+
+#zones {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.22;
+  image-rendering: pixelated;
   pointer-events: none;
+  display: none;
+}
+
+body.editing #zones {
+  display: block;
 }
 
 .ctl {
@@ -52,8 +67,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  pointer-events: auto;
-  touch-action: none;
+  pointer-events: none;
   font: 700 14px system-ui, sans-serif;
   letter-spacing: 0.04em;
   padding: 0;
