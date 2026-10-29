@@ -6,8 +6,6 @@ export interface ButtonLayout {
   /** Center position as a fraction of the viewport width / height. */
   x: number;
   y: number;
-  /** Diameter in CSS pixels. */
-  size: number;
 }
 
 export interface Settings {
@@ -23,18 +21,16 @@ export interface Settings {
 }
 
 export const SDF_OPTIONS = [5, 10, 20, 40, 0] as const;
-export const MIN_BUTTON_SIZE = 40;
-export const MAX_BUTTON_SIZE = 160;
 
 export function defaultButtons(): Record<Action, ButtonLayout> {
   return {
-    hard: { x: 0.13, y: 0.36, size: 72 },
-    left: { x: 0.06, y: 0.6, size: 72 },
-    right: { x: 0.2, y: 0.6, size: 72 },
-    soft: { x: 0.13, y: 0.84, size: 72 },
-    hold: { x: 0.83, y: 0.3, size: 64 },
-    rotL: { x: 0.8, y: 0.68, size: 80 },
-    rotR: { x: 0.92, y: 0.5, size: 80 },
+    hard: { x: 0.13, y: 0.36 },
+    left: { x: 0.06, y: 0.6 },
+    right: { x: 0.2, y: 0.6 },
+    soft: { x: 0.13, y: 0.84 },
+    hold: { x: 0.83, y: 0.3 },
+    rotL: { x: 0.8, y: 0.68 },
+    rotR: { x: 0.92, y: 0.5 },
   };
 }
 
@@ -64,7 +60,6 @@ export function loadSettings(): Settings {
       buttons[a] = {
         x: clamp(b.x, 0, 1, d.buttons[a].x),
         y: clamp(b.y, 0, 1, d.buttons[a].y),
-        size: clamp(b.size, MIN_BUTTON_SIZE, MAX_BUTTON_SIZE, d.buttons[a].size),
       };
     }
   }

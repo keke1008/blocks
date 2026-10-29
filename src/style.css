@@ -60,6 +60,8 @@ body.editing #zones {
 
 .ctl {
   position: absolute;
+  width: 72px;
+  height: 72px;
   transform: translate(-50%, -50%);
   border-radius: 50%;
   border: 2px solid var(--btn-border);

@@ -64,8 +64,6 @@ function placeButtons(): void {
     const b = settings.buttons[a];
     el.style.left = `${b.x * 100}%`;
     el.style.top = `${b.y * 100}%`;
-    el.style.width = el.style.height = `${b.size}px`;
-    el.style.fontSize = `${Math.round(b.size * 0.2)}px`;
     el.classList.toggle('selected', editing && a === selected);
   }
   if (editing) drawZones();
@@ -119,16 +117,13 @@ function buildControls(): void {
   placeButtons();
 }
 
-/**
- * The action whose marker is closest to the touch. Distance is scaled by the
- * marker radius so larger markers own a larger share of the screen.
- */
+/** The action whose marker is closest to the touch. */
 function nearestAction(x: number, y: number): Action {
   let best: Action = ACTIONS[0];
   let bestDist = Infinity;
   for (const a of ACTIONS) {
     const b = settings.buttons[a];
-    const d = Math.hypot(x - b.x * window.innerWidth, y - b.y * window.innerHeight) / (b.size / 2);
+    const d = Math.hypot(x - b.x * window.innerWidth, y - b.y * window.innerHeight);
     if (d < bestDist) {
       bestDist = d;
       best = a;
@@ -277,7 +272,6 @@ const arrInput = $<HTMLInputElement>('#set-arr');
 const sdfInput = $<HTMLSelectElement>('#set-sdf');
 const nextInput = $<HTMLInputElement>('#set-next');
 const ghostInput = $<HTMLInputElement>('#set-ghost');
-const sizeInput = $<HTMLInputElement>('#layout-size');
 
 function syncSettingsForm(): void {
   dasInput.value = String(settings.das);
@@ -311,15 +305,8 @@ function openSettings(from: 'menu' | 'pause'): void {
 }
 
 function syncLayoutBar(): void {
-  sizeInput.value = String(settings.buttons[selected].size);
   $('#layout-hint').textContent = `Selected: ${LABELS[selected]}`;
 }
-
-sizeInput.addEventListener('input', () => {
-  settings.buttons[selected].size = Number(sizeInput.value);
-  placeButtons();
-  saveSettings(settings);
-});
 
 function setEditing(on: boolean): void {
   editing = on;
