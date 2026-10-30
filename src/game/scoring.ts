@@ -9,7 +9,7 @@ const LINE_SCORES: Record<TSpin, readonly number[]> = {
 };
 
 const PERFECT_CLEAR_SCORES = [0, 800, 1200, 1800, 2000];
-const B2B_TETRIS_PERFECT_CLEAR = 3200;
+const B2B_QUAD_PERFECT_CLEAR = 3200;
 
 export interface ClearInput {
   lines: number;
@@ -58,7 +58,7 @@ export function scoreClear(input: ClearInput): ClearResult {
     if (combo > 0) points += 50 * combo * level;
     if (perfectClear) {
       const bonus =
-        lines === 4 && input.b2b ? B2B_TETRIS_PERFECT_CLEAR : PERFECT_CLEAR_SCORES[lines];
+        lines === 4 && input.b2b ? B2B_QUAD_PERFECT_CLEAR : PERFECT_CLEAR_SCORES[lines];
       points += bonus * level;
     }
   } else {
