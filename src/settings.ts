@@ -1,3 +1,5 @@
+import { readItem, writeItem } from './storage';
+
 export type Action = 'left' | 'right' | 'soft' | 'hard' | 'rotL' | 'rotR' | 'hold';
 
 export const ACTIONS: readonly Action[] = ['left', 'right', 'soft', 'hard', 'rotL', 'rotR', 'hold'];
@@ -48,9 +50,9 @@ export function loadSettings(): Settings {
   const d = defaultSettings();
   let raw: Partial<Settings> = {};
   try {
-    raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
+    raw = JSON.parse(readItem(STORAGE_KEY) ?? '{}');
   } catch {
-    // Ignore unreadable storage and fall back to defaults.
+    // Ignore unreadable settings and fall back to defaults.
   }
   const buttons = { ...d.buttons };
   for (const a of ACTIONS) {
@@ -73,9 +75,5 @@ export function loadSettings(): Settings {
 }
 
 export function saveSettings(s: Settings): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
-  } catch {
-    // Storage may be unavailable (private mode); settings then last for this session only.
-  }
+  writeItem(STORAGE_KEY, JSON.stringify(s));
 }

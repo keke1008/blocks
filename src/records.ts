@@ -2,6 +2,7 @@
 
 import type { Game } from './game/game';
 import type { Mode, RecordKind } from './game/modes';
+import { readItem, writeItem } from './storage';
 
 /** The value a finished game puts on the records, or null if it does not count. */
 export function resultValue(game: Game): number | null {
@@ -29,36 +30,21 @@ function key(mode: Mode): string {
 
 export function loadRecord(mode: Mode): number | null {
   if (mode.record === 'none') return null;
-  try {
-    const v = Number(localStorage.getItem(key(mode)));
-    return Number.isFinite(v) && v > 0 ? v : null;
-  } catch {
-    return null;
-  }
+  const v = Number(readItem(key(mode)));
+  return Number.isFinite(v) && v > 0 ? v : null;
 }
 
 export function saveRecord(mode: Mode, value: number): void {
-  try {
-    localStorage.setItem(key(mode), String(value));
-  } catch {
-    // Storage may be unavailable (private mode); the record then lasts for this session only.
-  }
+  writeItem(key(mode), String(value));
 }
 
+/** The last chosen mode. Kept apart from Settings so "Reset" there does not change it. */
 const MODE_KEY = 'blocks.mode.v1';
 
 export function loadModeId(): string | null {
-  try {
-    return localStorage.getItem(MODE_KEY);
-  } catch {
-    return null;
-  }
+  return readItem(MODE_KEY);
 }
 
 export function saveModeId(id: string): void {
-  try {
-    localStorage.setItem(MODE_KEY, id);
-  } catch {
-    // See saveRecord.
-  }
+  writeItem(MODE_KEY, id);
 }

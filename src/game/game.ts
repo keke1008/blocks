@@ -106,14 +106,14 @@ export class Game {
   private lastMoveRotation = false;
   private lastKickIndex = 0;
   private riseTimer = 0;
-  private holeX: number;
+  /** Column of the garbage hole; picked on the first rise. */
+  private holeX: number | null = null;
   private garbageRng: Rng;
 
   constructor(options: GameOptions = {}) {
     this.mode = options.mode ?? MARATHON;
     this.level = this.mode.level(0);
     this.garbageRng = options.garbageRng ?? Math.random;
-    this.holeX = Math.floor(this.garbageRng() * WIDTH);
     this.bag = new Bag(options.rng);
     this.softDropFactor = options.softDropFactor ?? 20;
     this._board = options.board ? options.board.map((row) => [...row]) : emptyBoard();
@@ -262,8 +262,9 @@ export class Game {
     const rise = this.mode.riseInterval;
     if (rise) {
       this.riseTimer += dt;
-      while (this.riseTimer >= rise(this.level)) {
-        this.riseTimer -= rise(this.level);
+      const interval = rise(this.level);
+      while (this.riseTimer >= interval) {
+        this.riseTimer -= interval;
         this.rise();
         if (this.status !== 'playing') return;
       }
@@ -358,12 +359,9 @@ export class Game {
     this.lockResets = 0;
     this.lastMoveRotation = false;
     this.lastKickIndex = 0;
-    // Block out.
-    if (this.collides(type, 0, x, y) && !this.topOut()) {
-      this._active = { type, rot: 0, x, y };
-      return;
-    }
     this._active = { type, rot: 0, x, y };
+    // Block out: the game ends, or (Zen) the board is cleared and the spawn goes ahead.
+    if (this.collides(type, 0, x, y) && !this.topOut()) return;
     this.pieceCount++;
     // Guideline: drop one row immediately if nothing is in the way.
     if (!this.collides(type, 0, x, y + 1)) this._active.y++;
@@ -462,7 +460,9 @@ export class Game {
       this.status = 'gameover';
       return;
     }
-    if (this.garbageRng() < GARBAGE_HOLE_CHANGE) {
+    if (this.holeX === null) {
+      this.holeX = Math.floor(this.garbageRng() * WIDTH);
+    } else if (this.garbageRng() < GARBAGE_HOLE_CHANGE) {
       this.holeX = (this.holeX + 1 + Math.floor(this.garbageRng() * (WIDTH - 1))) % WIDTH;
     }
     const row = Array<BoardCell>(WIDTH).fill('G');
@@ -473,13 +473,13 @@ export class Game {
 
     const p = this._active;
     if (!p) return;
-    // The stack moved up under the piece: lowest-row tracking moves with it,
-    // and a piece the stack now overlaps is pushed up on top of it.
-    this.lowestY--;
+    // A piece the stack now overlaps is pushed up on top of it. lowestY is left
+    // alone: being pushed up is not a descent, so it never refreshes lock resets.
     while (this.collides(p.type, p.rot, p.x, p.y)) {
       p.y--;
       this.lastMoveRotation = false;
-      if (p.y < 0) {
+      if (this.activeCells().some(([, y]) => y < 0)) {
+        // Pushed off the top of the buffer.
         this.status = 'gameover';
         return;
       }

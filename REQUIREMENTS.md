@@ -60,7 +60,7 @@ Mode rules are data (`src/game/modes.ts`); the Game reads them instead of branch
 ## Presentation
 - Simple look, standard piece colors (garbage is grey), minimal effects (a short text label for
   T-spins, B2B, REN, perfect clears and Zen board clears).
-- Side panel stats depend on the mode (Sprint shows a timer and lines left of 40);
+- Side panel stats depend on the mode (Sprint shows a timer and lines cleared out of 40, e.g. 12/40);
   Rising shows a bar beside the field that fills until the next garbage row.
 - Auto-pause when the app is hidden, loses focus or is turned to portrait.
 

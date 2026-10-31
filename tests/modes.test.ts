@@ -129,6 +129,8 @@ describe('zen', () => {
 
 describe('rising', () => {
   const fast = { ...RISING, riseInterval: () => 1000 };
+  /** Rises before gravity moves a piece (1000 ms) or the lock delay ends (500 ms). */
+  const quick = { ...RISING, riseInterval: () => 300 };
 
   it('raises the interval schedule from 8 s down to 2 s', () => {
     expect(riseIntervalMs(1)).toBe(8000);
@@ -157,7 +159,7 @@ describe('rising', () => {
 
   it('pushes the active piece up when the stack rises into it', () => {
     const game = new Game({
-      mode: { ...RISING, riseInterval: () => 300 }, // rises before the lock delay ends
+      mode: quick,
       garbageRng: seeded(5),
       board: boardFromRows(['#########.']),
       piece: { type: 'O', rot: 0, x: 3, y: B - 2 }, // resting on the bottom row
@@ -179,6 +181,25 @@ describe('rising', () => {
     for (let y = B - 14; y <= B; y++) {
       expect(game.board[y].filter((c) => c === null)).toHaveLength(1);
     }
+  });
+
+  it('pushes a piece into the top row of the buffer without ending', () => {
+    const rows = Array(HEIGHT).fill('..........');
+    rows[2] = '...####...';
+    // A flat I sits in row 1 of its box, so at y = -1 it occupies board row 0.
+    const game = new Game({ mode: quick, board: boardFromRows(rows), piece: { type: 'I', rot: 0, x: 3, y: 0 } });
+    game.update(300);
+    expect(game.status).toBe('playing');
+    expect(game.active!.y).toBe(-1);
+  });
+
+  it('does not refresh lock resets when the stack rises', () => {
+    const game = new Game({ mode: quick, piece: { type: 'T', rot: 0, x: 3, y: 25 } });
+    game['lockResets'] = 7;
+    game.update(300); // one rise; the piece is in the air and not pushed
+    expect(game.rises).toBe(1);
+    game.moveLeft();
+    expect(game['lockResets']).toBe(7);
   });
 
   it('ends when blocks would be pushed off the top', () => {

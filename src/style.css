@@ -14,6 +14,11 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* `hidden` always wins over a class or id rule that sets display. */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   margin: 0;
@@ -146,11 +151,6 @@ body:not(.playing) #pause-btn {
   z-index: 10;
 }
 
-.overlay[hidden],
-#layout-bar[hidden] {
-  display: none;
-}
-
 .overlay h1 {
   margin: 0;
   font-size: 44px;
@@ -206,10 +206,6 @@ button:active {
 #modes button[aria-pressed='true'] {
   border-color: var(--accent);
   box-shadow: inset 0 0 0 1px var(--accent);
-}
-
-.overlay [hidden] {
-  display: none;
 }
 
 /* ---------- settings ---------- */
@@ -325,10 +321,6 @@ button:active {
   border: 1px solid var(--accent);
   font-size: 14px;
   white-space: nowrap;
-}
-
-#update[hidden] {
-  display: none;
 }
 
 #update button {
