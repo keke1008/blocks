@@ -3,7 +3,7 @@ import { getKicks, pieceCells, type Cell, type PieceType, type Rotation } from '
 import { MARATHON, gravityMs, type Mode } from './modes';
 import { scoreClear, type TSpin } from './scoring';
 
-export { MARATHON_LINES, gravityMs } from './modes';
+export { gravityMs } from './modes';
 
 export const WIDTH = 10;
 export const VISIBLE_HEIGHT = 20;
@@ -424,13 +424,12 @@ export class Game {
 
     this.lines += cleared;
     const goal = this.mode.lineGoal;
-    if (goal !== null && this.lines >= goal) {
-      this.lines = goal;
-      this.level = this.mode.level(goal);
+    if (goal !== null) this.lines = Math.min(this.lines, goal);
+    this.level = this.mode.level(this.lines);
+    if (this.lines === goal) {
       this.status = 'complete';
       return;
     }
-    this.level = this.mode.level(this.lines);
     this.nextPiece();
   }
 

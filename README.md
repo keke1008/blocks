@@ -24,8 +24,8 @@ Tests are organised so most behaviour is checked without a browser:
 - `tests/modes.test.ts` covers each mode's rules, per-mode records (`src/records.ts`) and the
   side panel text (`src/hud.ts`).
 
-Adding a mode: add a `Mode` to `src/game/modes.ts` and `MODES` (the menu and the fuzz test pick
-it up), give it a case in `hudStats` if its panel differs, and add rule tests to
+Adding a mode: add a `Mode` to `src/game/modes.ts` and `MODES` (the menu, the side panel —
+laid out by the mode's record kind — and the fuzz test pick it up), and add rule tests to
 `tests/modes.test.ts`.
 - `tests/e2e/` covers what needs a browser: real multi-touch, screens, persistence and
   the service worker update banner.

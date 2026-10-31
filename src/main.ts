@@ -1,7 +1,7 @@
 import './style.css';
 import { Game } from './game/game';
 import { MARATHON, MODES, modeById, type Mode } from './game/modes';
-import { formatRecord, hudStats, resultText } from './hud';
+import { bestText, formatRecord, hudStats, resultText } from './hud';
 import { InputController } from './input';
 import { isBetter, loadModeId, loadRecord, resultValue, saveModeId, saveRecord } from './records';
 import { Renderer } from './render';
@@ -235,11 +235,7 @@ function finish(g: Game): void {
   $('#over-title').textContent = text.title;
   $('#over-label').textContent = text.label;
   $('#over-score').textContent = text.value;
-  $('#over-best').textContent = isBest
-    ? 'New best!'
-    : best === null
-      ? ''
-      : `Best: ${formatRecord(g.mode.record, best)}`;
+  $('#over-best').textContent = bestText(g.mode.record, best, isBest);
   setScreen('over');
 }
 
@@ -396,7 +392,7 @@ function frame(now: number): void {
   renderer.draw(game, {
     ghost: settings.ghost,
     nextCount: settings.nextCount,
-    stats: hudStats(game?.mode ?? mode, game, best),
+    stats: hudStats(mode, game, best),
   });
   requestAnimationFrame(frame);
 }

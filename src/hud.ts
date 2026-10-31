@@ -2,6 +2,7 @@
 
 import type { Game } from './game/game';
 import type { Mode, RecordKind } from './game/modes';
+import { isBetter } from './records';
 
 /** m:ss.cc */
 export function formatTime(ms: number): string {
@@ -23,26 +24,27 @@ export type Stat = readonly [label: string, value: string];
 export function hudStats(mode: Mode, game: Game | null, best: number | null): Stat[] {
   const score = game?.score ?? 0;
   const lines = game?.lines ?? 0;
-  const time = formatTime(game?.time ?? 0);
+  const time = () => formatTime(game?.time ?? 0);
   const goal = mode.lineGoal;
   const linesText = goal === null ? String(lines) : `${lines}/${goal}`;
-  switch (mode.id) {
-    case 'sprint':
+  // Laid out by what the mode records, so a new mode gets a fitting panel without edits here.
+  switch (mode.record) {
+    case 'time':
       return [
-        ['TIME', time],
+        ['TIME', time()],
         ['BEST', formatRecord('time', best)],
         ['LINES', linesText],
         ['SCORE', String(score)],
       ];
-    case 'zen':
+    case 'none':
       return [
         ['SCORE', String(score)],
         ['LINES', linesText],
-        ['TIME', time],
+        ['TIME', time()],
       ];
-    default: {
+    case 'score': {
       // Show the live score as best once it passes the record.
-      const liveBest = best === null ? (score > 0 ? score : null) : Math.max(best, score);
+      const liveBest = isBetter('score', score, best) ? score : best;
       return [
         ['SCORE', String(score)],
         ['BEST', formatRecord('score', liveBest)],
@@ -51,6 +53,13 @@ export function hudStats(mode: Mode, game: Game | null, best: number | null): St
       ];
     }
   }
+}
+
+/** Line under the result: the record, unless there is none yet. */
+export function bestText(kind: RecordKind, best: number | null, isNew: boolean): string {
+  if (isNew) return 'New best!';
+  if (best === null) return '';
+  return `Best: ${formatRecord(kind, best)}`;
 }
 
 export interface ResultText {

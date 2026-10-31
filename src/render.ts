@@ -107,7 +107,7 @@ export class Renderer {
     const x = ox - w - 4;
     ctx.fillStyle = '#1c2330';
     ctx.fillRect(x, oy, w, h);
-    ctx.fillStyle = progress > 0.75 ? '#ef2029' : GARBAGE_COLOR;
+    ctx.fillStyle = progress > 0.75 ? PIECE_COLORS.Z : GARBAGE_COLOR;
     ctx.fillRect(x, oy + h * (1 - progress), w, h * progress);
   }
 

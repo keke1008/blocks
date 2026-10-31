@@ -1,5 +1,6 @@
 import type { CDPSession, Page } from '@playwright/test';
 import type { Game } from '../../src/game/game';
+import type { ModeId } from '../../src/game/modes';
 import type { Action } from '../../src/settings';
 
 declare global {
@@ -8,9 +9,10 @@ declare global {
   }
 }
 
-/** Opens the app with the test hook enabled and starts a game. */
-export async function startGame(page: Page): Promise<void> {
+/** Opens the app with the test hook enabled and starts a game (in `mode`, if given). */
+export async function startGame(page: Page, mode?: ModeId): Promise<void> {
   await page.goto('./?e2e');
+  if (mode) await page.locator(`#modes [data-mode=${mode}]`).tap();
   await page.locator('#menu [data-action=start]').tap();
   await page.waitForFunction(() => window.__blocks.screen() === 'playing');
 }

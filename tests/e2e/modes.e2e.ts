@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { game } from './helpers';
+import { game, startGame } from './helpers';
 
 test.describe('modes', () => {
   test('the chosen mode is used, kept on restart and remembered after reload', async ({ page }) => {
@@ -39,10 +39,7 @@ test.describe('modes', () => {
   });
 
   test('a finished sprint shows the time and saves it as the best', async ({ page }) => {
-    await page.goto('./?e2e');
-    await page.locator('#modes [data-mode=sprint]').tap();
-    await page.locator('#menu [data-action=start]').tap();
-    await page.waitForFunction(() => window.__blocks.screen() === 'playing');
+    await startGame(page, 'sprint');
     // Finish the run through the game state; the rules themselves are unit tested.
     await game(page, (g) => {
       g.lines = 40;
@@ -58,10 +55,7 @@ test.describe('modes', () => {
   });
 
   test('pieces do not fall in zen', async ({ page }) => {
-    await page.goto('./?e2e');
-    await page.locator('#modes [data-mode=zen]').tap();
-    await page.locator('#menu [data-action=start]').tap();
-    await page.waitForFunction(() => window.__blocks.screen() === 'playing');
+    await startGame(page, 'zen');
     const y = await game(page, (g) => g.active!.y);
     await page.waitForTimeout(1500);
     expect(await game(page, (g) => g.active!.y)).toBe(y);
