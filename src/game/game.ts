@@ -1,6 +1,9 @@
 import { Bag, type Rng } from './bag';
 import { getKicks, pieceCells, type Cell, type PieceType, type Rotation } from './pieces';
+import { MARATHON, gravityMs, type Mode } from './modes';
 import { scoreClear, type TSpin } from './scoring';
+
+export { MARATHON_LINES, gravityMs } from './modes';
 
 export const WIDTH = 10;
 export const VISIBLE_HEIGHT = 20;
@@ -11,9 +14,11 @@ export const HEIGHT = VISIBLE_HEIGHT + BUFFER_HEIGHT;
 export const LOCK_DELAY_MS = 500;
 export const MAX_LOCK_RESETS = 15;
 export const QUEUE_SIZE = 6;
-export const MARATHON_LINES = 150;
+/** Chance that a rising garbage row moves its hole to another column. */
+export const GARBAGE_HOLE_CHANGE = 0.3;
 
-export type BoardCell = PieceType | null;
+/** 'G' is a garbage block (Rising mode). */
+export type BoardCell = PieceType | 'G' | null;
 export type Board = BoardCell[][];
 export type ReadonlyBoard = readonly (readonly BoardCell[])[];
 
@@ -34,7 +39,11 @@ export interface ClearEvent {
 }
 
 export interface GameOptions {
+  /** Mode rules. Defaults to Marathon. */
+  mode?: Mode;
   rng?: Rng;
+  /** Picks garbage hole columns (Rising). Defaults to Math.random. */
+  garbageRng?: Rng;
   /** Soft drop gravity multiplier. Infinity drops to the floor instantly. */
   softDropFactor?: number;
   /** Starting board (copied). For tests and puzzles. */
@@ -58,17 +67,12 @@ export function boardFromRows(rows: readonly string[]): Board {
   return board;
 }
 
-/** Guideline gravity: seconds per row = (0.8 - (level - 1) * 0.007) ^ (level - 1). */
-export function gravityMs(level: number): number {
-  const l = Math.min(level, 20) - 1;
-  return Math.pow(0.8 - l * 0.007, l) * 1000;
-}
-
 export function emptyBoard(): Board {
   return Array.from({ length: HEIGHT }, () => Array<BoardCell>(WIDTH).fill(null));
 }
 
 export class Game {
+  readonly mode: Mode;
   private _board: Board;
   private _active: ActivePiece | null = null;
   /** Increments every time a new piece enters play (spawn, hold swap or fixture). */
@@ -85,6 +89,10 @@ export class Game {
   status: GameStatus = 'playing';
   lastClear: ClearEvent | null = null;
   time = 0;
+  /** Garbage rows that have risen so far (Rising). */
+  rises = 0;
+  /** Times the board was cleared after a top out (Zen). */
+  boardResets = 0;
 
   private _softDrop = false;
   private softDropFactor: number;
@@ -97,8 +105,15 @@ export class Game {
   private lowestY = 0;
   private lastMoveRotation = false;
   private lastKickIndex = 0;
+  private riseTimer = 0;
+  private holeX: number;
+  private garbageRng: Rng;
 
   constructor(options: GameOptions = {}) {
+    this.mode = options.mode ?? MARATHON;
+    this.level = this.mode.level(0);
+    this.garbageRng = options.garbageRng ?? Math.random;
+    this.holeX = Math.floor(this.garbageRng() * WIDTH);
     this.bag = new Bag(options.rng);
     this.softDropFactor = options.softDropFactor ?? 20;
     this._board = options.board ? options.board.map((row) => [...row]) : emptyBoard();
@@ -122,6 +137,24 @@ export class Game {
 
   get softDropping(): boolean {
     return this._softDrop;
+  }
+
+  /** Progress toward the next garbage row, 0..1; null when the mode has none. */
+  get riseProgress(): number | null {
+    const interval = this.mode.riseInterval?.(this.level);
+    return interval ? Math.min(1, this.riseTimer / interval) : null;
+  }
+
+  /** Milliseconds per row from gravity alone (Infinity when the mode has none). */
+  gravityInterval(): number {
+    return this.mode.gravity(this.level);
+  }
+
+  /** Milliseconds per row while soft dropping (0 = instant). */
+  softDropInterval(): number {
+    const base = this.gravityInterval();
+    // Without gravity, soft drop runs at level 1 speed times the factor.
+    return (Number.isFinite(base) ? base : gravityMs(1)) / this.softDropFactor;
   }
 
   // ---------------------------------------------------------------- input
@@ -226,8 +259,17 @@ export class Game {
     if (this.status !== 'playing' || !this._active) return;
     this.time += dt;
 
-    const base = gravityMs(this.level);
-    const interval = this.softDropping ? base / this.softDropFactor : base;
+    const rise = this.mode.riseInterval;
+    if (rise) {
+      this.riseTimer += dt;
+      while (this.riseTimer >= rise(this.level)) {
+        this.riseTimer -= rise(this.level);
+        this.rise();
+        if (this.status !== 'playing') return;
+      }
+    }
+
+    const interval = this.softDropping ? this.softDropInterval() : this.gravityInterval();
 
     if (this.isGrounded()) {
       this.gravityAcc = 0;
@@ -316,10 +358,9 @@ export class Game {
     this.lockResets = 0;
     this.lastMoveRotation = false;
     this.lastKickIndex = 0;
-    if (this.collides(type, 0, x, y)) {
-      // Block out.
+    // Block out.
+    if (this.collides(type, 0, x, y) && !this.topOut()) {
       this._active = { type, rot: 0, x, y };
-      this.status = 'gameover';
       return;
     }
     this._active = { type, rot: 0, x, y };
@@ -360,7 +401,7 @@ export class Game {
 
     // Lock out: the whole piece is above the visible field.
     if (cells.every(([, y]) => y < BUFFER_HEIGHT)) {
-      this.status = 'gameover';
+      if (this.topOut()) this.nextPiece();
       return;
     }
 
@@ -382,16 +423,68 @@ export class Game {
     }
 
     this.lines += cleared;
-    this.level = Math.floor(this.lines / 10) + 1;
-    if (this.lines >= MARATHON_LINES) {
-      this.lines = Math.min(this.lines, MARATHON_LINES);
-      this.level = Math.min(this.level, MARATHON_LINES / 10);
+    const goal = this.mode.lineGoal;
+    if (goal !== null && this.lines >= goal) {
+      this.lines = goal;
+      this.level = this.mode.level(goal);
       this.status = 'complete';
       return;
     }
+    this.level = this.mode.level(this.lines);
+    this.nextPiece();
+  }
 
+  private nextPiece(): void {
     this.holdUsed = false;
     this.spawn(this.takeNext());
+  }
+
+  /**
+   * Handles a block out or lock out. Returns true when play continues (the
+   * board was cleared), false when the game is over.
+   */
+  private topOut(): boolean {
+    if (this.mode.topOut === 'end') {
+      this.status = 'gameover';
+      return false;
+    }
+    this._board = emptyBoard();
+    this.combo = -1;
+    this.b2b = false;
+    this.boardResets++;
+    this.lastClear = { labels: ['BOARD CLEARED'], points: 0, at: this.time };
+    return true;
+  }
+
+  /** Pushes the stack up one row and adds a garbage row with one hole at the bottom. */
+  private rise(): void {
+    if (this._board[0].some((c) => c !== null)) {
+      // Blocks would be pushed off the top of the buffer.
+      this.status = 'gameover';
+      return;
+    }
+    if (this.garbageRng() < GARBAGE_HOLE_CHANGE) {
+      this.holeX = (this.holeX + 1 + Math.floor(this.garbageRng() * (WIDTH - 1))) % WIDTH;
+    }
+    const row = Array<BoardCell>(WIDTH).fill('G');
+    row[this.holeX] = null;
+    this._board.shift();
+    this._board.push(row);
+    this.rises++;
+
+    const p = this._active;
+    if (!p) return;
+    // The stack moved up under the piece: lowest-row tracking moves with it,
+    // and a piece the stack now overlaps is pushed up on top of it.
+    this.lowestY--;
+    while (this.collides(p.type, p.rot, p.x, p.y)) {
+      p.y--;
+      this.lastMoveRotation = false;
+      if (p.y < 0) {
+        this.status = 'gameover';
+        return;
+      }
+    }
   }
 
   private clearLines(): number {

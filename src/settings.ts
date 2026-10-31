@@ -39,7 +39,6 @@ export function defaultSettings(): Settings {
 }
 
 const STORAGE_KEY = 'blocks.settings.v1';
-const BEST_KEY = 'blocks.best.v1';
 
 function clamp(v: unknown, min: number, max: number, fallback: number): number {
   return typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback;
@@ -78,21 +77,5 @@ export function saveSettings(s: Settings): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
   } catch {
     // Storage may be unavailable (private mode); settings then last for this session only.
-  }
-}
-
-export function loadBest(): number {
-  try {
-    return Number(localStorage.getItem(BEST_KEY)) || 0;
-  } catch {
-    return 0;
-  }
-}
-
-export function saveBest(score: number): void {
-  try {
-    localStorage.setItem(BEST_KEY, String(score));
-  } catch {
-    // See saveSettings.
   }
 }

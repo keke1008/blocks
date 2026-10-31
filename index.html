@@ -23,10 +23,11 @@
 
     <section id="menu" class="overlay">
       <h1>BLOCKS</h1>
-      <p class="sub">Marathon · 150 lines</p>
+      <div id="modes" role="group" aria-label="Mode"></div>
+      <p class="sub" id="menu-summary"></p>
       <button data-action="start" class="primary">Start</button>
       <button data-action="settings">Settings</button>
-      <p class="best">Best: <span id="menu-best">0</span></p>
+      <p class="best" id="menu-best-row">Best: <span id="menu-best">-</span></p>
     </section>
 
     <section id="pause" class="overlay" hidden>
@@ -39,7 +40,7 @@
 
     <section id="over" class="overlay" hidden>
       <h2 id="over-title">Game Over</h2>
-      <p class="score">Score <span id="over-score">0</span></p>
+      <p class="score"><span id="over-label">Score</span> <span id="over-score">0</span></p>
       <p class="best" id="over-best"></p>
       <button data-action="restart" class="primary">Play Again</button>
       <button data-action="quit">Menu</button>

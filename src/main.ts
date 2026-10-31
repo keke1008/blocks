@@ -1,15 +1,16 @@
 import './style.css';
 import { Game } from './game/game';
+import { MARATHON, MODES, modeById, type Mode } from './game/modes';
+import { formatRecord, hudStats, resultText } from './hud';
 import { InputController } from './input';
+import { isBetter, loadModeId, loadRecord, resultValue, saveModeId, saveRecord } from './records';
 import { Renderer } from './render';
 import { LayoutDrag, TouchRouter, nearestAction, type ControlEvent, type Viewport } from './touch';
 import {
   ACTIONS,
   defaultButtons,
   defaultSettings,
-  loadBest,
   loadSettings,
-  saveBest,
   saveSettings,
   type Action,
 } from './settings';
@@ -19,7 +20,8 @@ type Screen = 'menu' | 'playing' | 'paused' | 'over';
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
 
 let settings = loadSettings();
-let best = loadBest();
+let mode: Mode = modeById(loadModeId()) ?? MARATHON;
+let best = loadRecord(mode);
 let game: Game | null = null;
 let screen: Screen = 'menu';
 /** Overlay to return to when leaving the settings panel. */
@@ -173,7 +175,7 @@ function setScreen(s: Screen): void {
   document.body.classList.toggle('playing', s === 'playing');
   if (s !== 'playing') releaseAllButtons();
   if (s === 'menu') {
-    $('#menu-best').textContent = String(best);
+    syncMenu();
     showOverlay('menu');
   } else if (s === 'paused') {
     showOverlay('pause');
@@ -185,9 +187,36 @@ function setScreen(s: Screen): void {
   syncUpdateBanner();
 }
 
+function buildModeButtons(): void {
+  const root = $('#modes');
+  for (const m of MODES) {
+    const el = document.createElement('button');
+    el.dataset.mode = m.id;
+    el.textContent = m.name;
+    el.addEventListener('click', () => selectMode(m));
+    root.appendChild(el);
+  }
+}
+
+function selectMode(m: Mode): void {
+  mode = m;
+  best = loadRecord(mode);
+  saveModeId(mode.id);
+  syncMenu();
+}
+
+function syncMenu(): void {
+  for (const el of document.querySelectorAll<HTMLElement>('#modes [data-mode]')) {
+    el.setAttribute('aria-pressed', String(el.dataset.mode === mode.id));
+  }
+  $('#menu-summary').textContent = mode.summary;
+  $('#menu-best-row').hidden = mode.record === 'none';
+  $('#menu-best').textContent = formatRecord(mode.record, best);
+}
+
 function startGame(): void {
   releaseAllButtons();
-  game = new Game();
+  game = new Game({ mode });
   setScreen('playing');
 }
 
@@ -196,14 +225,21 @@ function pause(): void {
 }
 
 function finish(g: Game): void {
-  const isBest = g.score > best;
+  const value = resultValue(g);
+  const isBest = value !== null && isBetter(g.mode.record, value, best);
   if (isBest) {
-    best = g.score;
-    saveBest(best);
+    best = value;
+    saveRecord(g.mode, value);
   }
-  $('#over-title').textContent = g.status === 'complete' ? 'Complete!' : 'Game Over';
-  $('#over-score').textContent = String(g.score);
-  $('#over-best').textContent = isBest ? 'New best!' : `Best: ${best}`;
+  const text = resultText(g);
+  $('#over-title').textContent = text.title;
+  $('#over-label').textContent = text.label;
+  $('#over-score').textContent = text.value;
+  $('#over-best').textContent = isBest
+    ? 'New best!'
+    : best === null
+      ? ''
+      : `Best: ${formatRecord(g.mode.record, best)}`;
   setScreen('over');
 }
 
@@ -357,16 +393,21 @@ function frame(now: number): void {
     game.update(dt);
     if (game.status !== 'playing') finish(game);
   }
-  renderer.draw(game, { ghost: settings.ghost, nextCount: settings.nextCount, best });
+  renderer.draw(game, {
+    ghost: settings.ghost,
+    nextCount: settings.nextCount,
+    stats: hudStats(game?.mode ?? mode, game, best),
+  });
   requestAnimationFrame(frame);
 }
 
-// Read-only window into the game for the browser tests (tests/e2e).
+// Window into the game for the browser tests (tests/e2e).
 if (new URLSearchParams(location.search).has('e2e')) {
   Object.assign(window, { __blocks: { game: () => game, screen: () => screen } });
 }
 
 buildControls();
+buildModeButtons();
 renderer.resize();
 setScreen('menu');
 requestAnimationFrame(frame);

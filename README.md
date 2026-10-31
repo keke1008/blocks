@@ -18,7 +18,15 @@ Tests are organised so most behaviour is checked without a browser:
 - `src/touch.ts` routes touches to actions with no DOM access (`tests/touch.test.ts`).
 - `Game` takes a starting board/piece and exposes input as methods; `tests/helpers.ts`
   replays timed input scripts through the real `InputController` + `Game`.
-- `tests/fuzz.test.ts` plays seeded random games and checks invariants every frame.
+- `tests/fuzz.test.ts` plays seeded random games in every mode and checks invariants every
+  frame. It also asserts the runs reach each mode's key states (garbage rising, Zen board
+  clears, game over) so the checks cannot silently stop covering them.
+- `tests/modes.test.ts` covers each mode's rules, per-mode records (`src/records.ts`) and the
+  side panel text (`src/hud.ts`).
+
+Adding a mode: add a `Mode` to `src/game/modes.ts` and `MODES` (the menu and the fuzz test pick
+it up), give it a case in `hudStats` if its panel differs, and add rule tests to
+`tests/modes.test.ts`.
 - `tests/e2e/` covers what needs a browser: real multi-touch, screens, persistence and
   the service worker update banner.
 

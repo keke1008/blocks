@@ -1,7 +1,20 @@
-import { BUFFER_HEIGHT, VISIBLE_HEIGHT, WIDTH, type Game } from './game/game';
+import { BUFFER_HEIGHT, VISIBLE_HEIGHT, WIDTH, type BoardCell, type Game } from './game/game';
 import { PIECE_COLORS, pieceCells, type PieceType } from './game/pieces';
+import type { Stat } from './hud';
 
 const LABEL_MS = 1500;
+const GARBAGE_COLOR = '#6b7689';
+
+export interface DrawOptions {
+  ghost: boolean;
+  nextCount: number;
+  /** Side panel stats, from hud.ts. */
+  stats: readonly Stat[];
+}
+
+function cellColor(c: Exclude<BoardCell, null>): string {
+  return c === 'G' ? GARBAGE_COLOR : PIECE_COLORS[c];
+}
 
 /** Board + hold + next drawn on a single full-screen canvas, centered. */
 export class Renderer {
@@ -29,7 +42,7 @@ export class Renderer {
     this.oy = Math.round((h - VISIBLE_HEIGHT * this.cell) / 2);
   }
 
-  draw(game: Game | null, opts: { ghost: boolean; nextCount: number; best: number }): void {
+  draw(game: Game | null, opts: DrawOptions): void {
     const { ctx, cell, ox, oy } = this;
     ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
@@ -54,6 +67,7 @@ export class Renderer {
 
     this.drawPanels(game, opts);
     if (!game) return;
+    this.drawRiseGauge(game);
 
     // Locked blocks. The row just above the field is drawn partially so
     // pieces stacked into the buffer are still visible.
@@ -64,7 +78,7 @@ export class Renderer {
     for (let y = BUFFER_HEIGHT - 1; y < game.board.length; y++) {
       for (let x = 0; x < WIDTH; x++) {
         const c = game.board[y][x];
-        if (c) this.block(ox + x * cell, oy + (y - BUFFER_HEIGHT) * cell, cell, PIECE_COLORS[c]);
+        if (c) this.block(ox + x * cell, oy + (y - BUFFER_HEIGHT) * cell, cell, cellColor(c));
       }
     }
 
@@ -83,7 +97,21 @@ export class Renderer {
     ctx.restore();
   }
 
-  private drawPanels(game: Game | null, opts: { nextCount: number; best: number }): void {
+  /** Thin bar left of the field that fills up until the next garbage row rises. */
+  private drawRiseGauge(game: Game): void {
+    const progress = game.riseProgress;
+    if (progress === null) return;
+    const { ctx, cell, ox, oy } = this;
+    const h = VISIBLE_HEIGHT * cell;
+    const w = Math.max(3, Math.round(cell * 0.2));
+    const x = ox - w - 4;
+    ctx.fillStyle = '#1c2330';
+    ctx.fillRect(x, oy, w, h);
+    ctx.fillStyle = progress > 0.75 ? '#ef2029' : GARBAGE_COLOR;
+    ctx.fillRect(x, oy + h * (1 - progress), w, h * progress);
+  }
+
+  private drawPanels(game: Game | null, opts: DrawOptions): void {
     const { ctx, cell, ox, oy } = this;
     const leftX = ox - cell * 5.5;
     const rightX = ox + WIDTH * cell + cell * 0.5;
@@ -108,14 +136,8 @@ export class Renderer {
     }
 
     // Stats under the hold box.
-    const stats: [string, string][] = [
-      ['SCORE', String(game?.score ?? 0)],
-      ['BEST', String(Math.max(opts.best, game?.score ?? 0))],
-      ['LEVEL', String(game?.level ?? 1)],
-      ['LINES', String(game?.lines ?? 0)],
-    ];
     let y = oy + cell * 5;
-    for (const [label, value] of stats) {
+    for (const [label, value] of opts.stats) {
       ctx.fillStyle = '#8b95a7';
       ctx.font = `600 ${small}px system-ui, sans-serif`;
       ctx.fillText(label, leftX, y);
@@ -137,8 +159,10 @@ export class Renderer {
         ctx.fillText(label, leftX, ly);
         ly += small + 4;
       }
-      ctx.fillStyle = '#e6edf3';
-      ctx.fillText(`+${ev.points}`, leftX, ly);
+      if (ev.points > 0) {
+        ctx.fillStyle = '#e6edf3';
+        ctx.fillText(`+${ev.points}`, leftX, ly);
+      }
       ctx.globalAlpha = 1;
     }
   }

@@ -45,13 +45,23 @@ A single-player falling block puzzle for Android phones in landscape.
 T-spin detection uses the 3-corner rule; a Mini is upgraded to a full T-spin when
 both front corners are filled or the 5th kick test was used.
 
-## Mode
-- Marathon only: level up every 10 lines, guideline gravity curve, ends at 150 lines (level 15).
-- Best score saved on the device.
+## Modes
+Chosen on the menu; the last choice is remembered. Each mode keeps its own best on the device.
+
+| Mode | Rules | Ends | Best |
+| --- | --- | --- | --- |
+| Marathon | Level up every 10 lines, guideline gravity curve | 150 lines (level 15) or top out | Score |
+| Sprint | Level 1 gravity throughout | 40 lines or top out | Time (only when 40 lines are cleared) |
+| Zen | No gravity (soft / hard drop still work); level 1 | Never: a top out clears the board and play continues | None |
+| Rising | As Marathon, plus a garbage row (one hole) rises from the bottom every 8 s at level 1, 0.5 s sooner per level, down to 2 s. A hole moves to another column 30% of the time. A piece the stack rises into is pushed up. | Top out, or blocks pushed off the top of the buffer | Score |
+
+Mode rules are data (`src/game/modes.ts`); the Game reads them instead of branching on the mode.
 
 ## Presentation
-- Simple look, standard piece colors, minimal effects (a short text label for
-  T-spins, B2B, REN and perfect clears).
+- Simple look, standard piece colors (garbage is grey), minimal effects (a short text label for
+  T-spins, B2B, REN, perfect clears and Zen board clears).
+- Side panel stats depend on the mode (Sprint shows a timer and lines left of 40);
+  Rising shows a bar beside the field that fills until the next garbage row.
 - Auto-pause when the app is hidden, loses focus or is turned to portrait.
 
 ## Settings
