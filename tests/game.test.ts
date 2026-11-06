@@ -7,6 +7,7 @@ import {
   boardFromRows,
   gravityMs,
 } from '../src/game/game';
+import { ENDLESS } from '../src/game/modes';
 import { PIECE_TYPES, getKicks, pieceCells } from '../src/game/pieces';
 import { scoreClear } from '../src/game/scoring';
 import { seeded } from './helpers';
@@ -148,9 +149,54 @@ describe('game', () => {
     expect(game.status).toBe('gameover');
   });
 
-  it('speeds up gravity with level', () => {
+  it('speeds up gravity with level, reaching 20G at level 20', () => {
     expect(gravityMs(1)).toBe(1000);
     expect(gravityMs(10)).toBeLessThan(gravityMs(9));
+    expect(gravityMs(19)).toBeGreaterThan(0);
+    expect(gravityMs(20)).toBe(0);
+    expect(gravityMs(99)).toBe(0);
+  });
+});
+
+describe('20G', () => {
+  /** An Endless game at level 20 with an O on the floor. */
+  function at20G(): Game {
+    const game = new Game({ mode: ENDLESS, piece: { type: 'O', rot: 0, x: 3, y: B - 1 } });
+    // Level is recomputed from lines on every lock; Endless has no level cap.
+    game.lines = 190;
+    game.level = 20;
+    return game;
+  }
+
+  it('lands a new piece on the stack as it spawns, with no frame in the air', () => {
+    const game = at20G();
+    game.hardDrop();
+    expect(game.pieceCount).toBe(2);
+    expect(game.active!.y).toBe(game.ghostY());
+  });
+
+  it('drops a piece the moment it moves off a ledge, without soft drop points', () => {
+    // A ledge under columns 0-1; an O on it is still held after one step right, not after two.
+    const game = new Game({
+      board: boardFromRows(['##........', '##........', '##........']),
+      piece: { type: 'O', rot: 0, x: -1, y: B - 4 },
+    });
+    game.level = 20;
+    const score = game.score;
+    expect(game.moveRight()).toBe(true);
+    expect(game.active!.y).toBe(B - 4);
+    expect(game.moveRight()).toBe(true);
+    expect(game.active!.y).toBe(B - 1);
+    expect(game.score).toBe(score);
+  });
+
+  it('still waits the lock delay once landed', () => {
+    const game = at20G();
+    game.hardDrop();
+    game.update(LOCK_DELAY_MS - 1);
+    expect(game.pieceCount).toBe(2);
+    game.update(1);
+    expect(game.pieceCount).toBe(3);
   });
 });
 

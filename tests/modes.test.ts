@@ -2,13 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { BUFFER_HEIGHT, Game, HEIGHT, WIDTH, boardFromRows, type ActivePiece } from '../src/game/game';
 import {
   ENDLESS,
-  LOCK_DELAY_MS,
   MARATHON,
   MODES,
   RISING,
   SPRINT,
   ZEN,
-  endlessLockDelayMs,
   gravityMs,
   modeById,
   riseIntervalMs,
@@ -63,22 +61,11 @@ describe('endless', () => {
     expect(ENDLESS.level(999)).toBe(100);
   });
 
-  it('shortens the lock delay after level 20, down to 200 ms', () => {
-    expect(endlessLockDelayMs(1)).toBe(LOCK_DELAY_MS);
-    expect(endlessLockDelayMs(20)).toBe(LOCK_DELAY_MS);
-    expect(endlessLockDelayMs(21)).toBe(480);
-    expect(endlessLockDelayMs(35)).toBe(200);
-    expect(endlessLockDelayMs(100)).toBe(200);
-    for (const m of MODES) if (m !== ENDLESS) expect(m.lockDelay(100)).toBe(LOCK_DELAY_MS);
-  });
-
-  it('locks a grounded piece after the shorter delay at high levels', () => {
-    const game = new Game({ mode: ENDLESS, piece: { type: 'O', rot: 0, x: 3, y: B - 1 } });
-    game.level = 35;
-    game.update(199);
-    expect(game.pieceCount).toBe(1);
-    game.update(1);
-    expect(game.pieceCount).toBe(2);
+  it('reaches 20G at level 20 (190 lines)', () => {
+    expect(ENDLESS.level(189)).toBe(19);
+    expect(ENDLESS.level(190)).toBe(20);
+    expect(ENDLESS.gravity(19)).toBeGreaterThan(0);
+    expect(ENDLESS.gravity(20)).toBe(0);
   });
 
   it('records the score of an ended game', () => {

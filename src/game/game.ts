@@ -3,7 +3,7 @@ import { getKicks, pieceCells, type Cell, type PieceType, type Rotation } from '
 import { MARATHON, gravityMs, type Mode } from './modes';
 import { scoreClear, type TSpin } from './scoring';
 
-export { LOCK_DELAY_MS, gravityMs } from './modes';
+export { TWENTY_G_LEVEL, gravityMs } from './modes';
 
 export const WIDTH = 10;
 export const VISIBLE_HEIGHT = 20;
@@ -11,6 +11,7 @@ export const VISIBLE_HEIGHT = 20;
 export const BUFFER_HEIGHT = 20;
 export const HEIGHT = VISIBLE_HEIGHT + BUFFER_HEIGHT;
 
+export const LOCK_DELAY_MS = 500;
 export const MAX_LOCK_RESETS = 15;
 export const QUEUE_SIZE = 6;
 /** Chance that a rising garbage row moves its hole to another column. */
@@ -144,7 +145,7 @@ export class Game {
     return interval ? Math.min(1, this.riseTimer / interval) : null;
   }
 
-  /** Milliseconds per row from gravity alone (Infinity when the mode has none). */
+  /** Milliseconds per row from gravity alone (0 = 20G, Infinity when the mode has none). */
   gravityInterval(): number {
     return this.mode.gravity(this.level);
   }
@@ -274,7 +275,7 @@ export class Game {
     if (this.isGrounded()) {
       this.gravityAcc = 0;
     } else if (interval <= 0) {
-      this.dropRows(Infinity, true);
+      this.dropRows(Infinity, this.softDropping);
     } else {
       // Tracked in rows rather than ms so switching soft drop on mid-fall
       // does not cash in the time already spent at normal speed.
@@ -292,7 +293,7 @@ export class Game {
         return;
       }
       this.lockTimer += dt;
-      if (this.lockTimer >= this.mode.lockDelay(this.level)) this.lock();
+      if (this.lockTimer >= LOCK_DELAY_MS) this.lock();
     }
   }
 
@@ -322,8 +323,17 @@ export class Game {
     }
   }
 
+  /**
+   * 20G: the piece lands on the stack at once, on spawn and after every move, so it is
+   * never drawn in the air whatever the frame rate. Counts as gravity, not soft drop.
+   */
+  private applyTwentyG(): void {
+    if (this.gravityInterval() <= 0) this.dropRows(Infinity, false);
+  }
+
   /** Lock delay reset after a successful move or rotation. */
   private afterMove(): void {
+    this.applyTwentyG();
     this.onDescend();
     if (this.lockTimer > 0 || this.isGrounded()) {
       if (this.lockResets < MAX_LOCK_RESETS) {
@@ -365,6 +375,7 @@ export class Game {
     // Guideline: drop one row immediately if nothing is in the way.
     if (!this.collides(type, 0, x, y + 1)) this._active.y++;
     this.lowestY = this._active.y;
+    this.applyTwentyG();
   }
 
   /** 3-corner T-spin detection. Must be called before the piece is merged. */

@@ -15,10 +15,11 @@ export interface Mode {
   lineGoal: number | null;
   /** Level for a total number of cleared lines (also the score multiplier). */
   level(lines: number): number;
-  /** Milliseconds per row at a level. Infinity = no gravity (soft drop still works). */
+  /**
+   * Milliseconds per row at a level. 0 = 20G (a piece drops to the stack the moment it
+   * spawns or moves). Infinity = no gravity (soft drop still works).
+   */
   gravity(level: number): number;
-  /** Milliseconds a grounded piece waits before locking at a level. */
-  lockDelay(level: number): number;
   /** On block out / lock out: end the game, or clear the board and keep playing. */
   topOut: 'end' | 'clear';
   /** Milliseconds between rising garbage rows at a level; null = no garbage. */
@@ -26,15 +27,18 @@ export interface Mode {
   record: RecordKind;
 }
 
-/** Guideline gravity: seconds per row = (0.8 - (level - 1) * 0.007) ^ (level - 1). */
+/** First level of guideline gravity that is 20G. */
+export const TWENTY_G_LEVEL = 20;
+
+/**
+ * Guideline gravity: seconds per row = (0.8 - (level - 1) * 0.007) ^ (level - 1),
+ * and 20G (0) from level 20. Any mode whose level reaches 20 plays at 20G.
+ */
 export function gravityMs(level: number): number {
-  const l = Math.min(level, 20) - 1;
+  if (level >= TWENTY_G_LEVEL) return 0;
+  const l = level - 1;
   return Math.pow(0.8 - l * 0.007, l) * 1000;
 }
-
-/** Lock delay used by every mode except Endless past level 20. */
-export const LOCK_DELAY_MS = 500;
-const fixedLockDelay = () => LOCK_DELAY_MS;
 
 const levelEvery10 = (lines: number) => Math.floor(lines / 10) + 1;
 
@@ -48,7 +52,6 @@ export const MARATHON: Mode = {
   lineGoal: MARATHON_LINES,
   level: (lines) => Math.min(levelEvery10(lines), MARATHON_LINES / 10),
   gravity: gravityMs,
-  lockDelay: fixedLockDelay,
   topOut: 'end',
   riseInterval: null,
   record: 'score',
@@ -61,7 +64,6 @@ export const SPRINT: Mode = {
   lineGoal: SPRINT_LINES,
   level: () => 1,
   gravity: gravityMs,
-  lockDelay: fixedLockDelay,
   topOut: 'end',
   riseInterval: null,
   record: 'time',
@@ -74,7 +76,6 @@ export const ZEN: Mode = {
   lineGoal: null,
   level: () => 1,
   gravity: () => Infinity,
-  lockDelay: fixedLockDelay,
   topOut: 'clear',
   riseInterval: null,
   record: 'none',
@@ -92,28 +93,18 @@ export const RISING: Mode = {
   lineGoal: null,
   level: levelEvery10,
   gravity: gravityMs,
-  lockDelay: fixedLockDelay,
   topOut: 'end',
   riseInterval: riseIntervalMs,
   record: 'score',
 };
 
-/**
- * Endless lock delay: gravity is already instant by level 20, so from there the
- * lock delay shortens by 20 ms per level, from 500 ms down to 200 ms at level 35.
- */
-export function endlessLockDelayMs(level: number): number {
-  return Math.max(200, LOCK_DELAY_MS - Math.max(0, level - 20) * 20);
-}
-
 export const ENDLESS: Mode = {
   id: 'endless',
   name: 'Endless',
-  summary: 'Marathon with no line goal and no level cap',
+  summary: 'No line goal, no level cap: 20G from level 20',
   lineGoal: null,
   level: levelEvery10,
   gravity: gravityMs,
-  lockDelay: endlessLockDelayMs,
   topOut: 'end',
   riseInterval: null,
   record: 'score',

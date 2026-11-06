@@ -29,6 +29,10 @@ A single-player falling block puzzle for Android phones in landscape.
 - Hard drop and soft drop.
 - Lock delay 0.5 s, reset by moves/rotations up to 15 times (refreshed when the piece reaches a new lowest row).
 - No line clear delay, no entry delay. No 180° rotation.
+- Gravity (shared by every mode that uses it): the guideline curve up to level 19, then 20G
+  from level 20. At 20G a piece lands on the stack the moment it spawns or moves (it is never
+  drawn in the air, whatever the frame rate); landing this way gives no soft drop points, and
+  the normal lock delay still applies.
 - Game over on block out (spawn blocked) or lock out (piece locked fully above the field).
 
 ## Scoring (all × level)
@@ -51,10 +55,12 @@ Chosen on the menu; the last choice is remembered. Each mode keeps its own best 
 | Mode | Rules | Ends | Best |
 | --- | --- | --- | --- |
 | Marathon | Level up every 10 lines, guideline gravity curve | 150 lines (level 15) or top out | Score |
-| Endless | As Marathon with no line goal and no level cap (the score multiplier keeps growing). Gravity stops speeding up at level 20; from level 21 the lock delay shortens by 20 ms per level, from 500 ms down to 200 ms at level 35. | Top out | Score |
+| Endless | As Marathon with no line goal and no level cap (the score multiplier keeps growing); 20G from level 20 (190 lines) | Top out | Score |
 | Sprint | Level 1 gravity throughout | 40 lines or top out | Time (only when 40 lines are cleared) |
 | Zen | No gravity (soft / hard drop still work); level 1 | Never: a top out clears the board and play continues | None |
 | Rising | As Marathon, plus a garbage row (one hole) rises from the bottom every 8 s at level 1, 0.5 s sooner per level, down to 2 s. A hole moves to another column 30% of the time. A piece the stack rises into is pushed up. | Top out, or blocks pushed off the top of the buffer | Score |
+
+Endless and Rising have no level cap, so both reach 20G at level 20.
 
 Mode rules are data (`src/game/modes.ts`); the Game reads them instead of branching on the mode.
 

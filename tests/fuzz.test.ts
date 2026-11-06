@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { HEIGHT, WIDTH, type GameStatus } from '../src/game/game';
-import { MODES, RISING, type Mode } from '../src/game/modes';
+import { ENDLESS, MODES, RISING, type Mode } from '../src/game/modes';
 import { ACTIONS, SDF_OPTIONS } from '../src/settings';
 import { Replay, seeded } from './helpers';
 
@@ -11,10 +11,13 @@ interface Reached {
   gameover: number;
   rises: number;
   boardResets: number;
+  /** Frames played at 20G. */
+  twentyG: number;
 }
 
 /**
- * Every mode, plus Rising with garbage fast enough to reach the top within a run.
+ * Every mode, plus Rising with garbage fast enough to reach the top within a run, and
+ * 20G (reached at level 20, too far for random play) in Endless and Rising.
  * `expect` lists states the random runs must reach, so the invariants are known to
  * have been checked there (a change that makes them unreachable fails the test).
  */
@@ -28,6 +31,12 @@ const FUZZ_MODES: readonly { name: string; mode: Mode; expect: (keyof Reached)[]
     ],
   })),
   { name: 'rising (fast garbage)', mode: { ...RISING, riseInterval: () => 400 }, expect: ['rises', 'gameover'] },
+  { name: 'endless (20G)', mode: { ...ENDLESS, gravity: () => 0 }, expect: ['twentyG', 'gameover'] },
+  {
+    name: 'rising (20G, fast garbage)',
+    mode: { ...RISING, gravity: () => 0, riseInterval: () => 400 },
+    expect: ['twentyG', 'rises', 'gameover'],
+  },
 ];
 const RUNS = 150;
 const FRAMES = 1500;
@@ -39,7 +48,7 @@ function check(ok: boolean, msg: string): void {
 
 describe('random play invariants', () => {
   it.each(FUZZ_MODES)('holds for random inputs, settings and frame times: $name', ({ mode, expect: wanted }) => {
-    const reached: Reached = { gameover: 0, rises: 0, boardResets: 0 };
+    const reached: Reached = { gameover: 0, rises: 0, boardResets: 0, twentyG: 0 };
     for (let seed = 1; seed <= RUNS; seed++) {
       const rnd = seeded(seed * 7919);
       const pick = <T>(xs: readonly T[]) => xs[Math.floor(rnd() * xs.length)];
@@ -91,6 +100,11 @@ describe('random play invariants', () => {
         // Garbage only in modes that have it; the board is only reset in modes that allow it.
         if (!mode.riseInterval) check(g.rises === 0, `${ctx}: garbage rose in ${mode.id}`);
         if (mode.topOut === 'end') check(g.boardResets === 0, `${ctx}: board reset in ${mode.id}`);
+        // At 20G the piece is never seen in the air.
+        if (g.gravityInterval() <= 0) {
+          check(p.y === g.ghostY(), `${ctx}: piece in the air at 20G at frame ${f}`);
+          reached.twentyG++;
+        }
 
         if (g.pieceCount === before.piece) {
           // Gravity can move a piece at most ceil(dt / interval) rows per frame.
