@@ -210,7 +210,8 @@ function syncMenu(): void {
     el.setAttribute('aria-pressed', String(el.dataset.mode === mode.id));
   }
   $('#menu-summary').textContent = mode.summary;
-  $('#menu-best-row').hidden = mode.record === 'none';
+  // Keep the row's space so the menu layout doesn't shift between modes.
+  $('#menu-best-row').style.visibility = mode.record === 'none' ? 'hidden' : '';
   $('#menu-best').textContent = formatRecord(mode.record, best);
 }
 
