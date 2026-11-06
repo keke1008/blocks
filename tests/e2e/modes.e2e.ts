@@ -34,6 +34,8 @@ test.describe('modes', () => {
     await expect(page.locator('#menu-best')).toHaveText('1:01.23');
     await page.locator('#modes [data-mode=rising]').tap();
     await expect(page.locator('#menu-best')).toHaveText('-');
+    await page.locator('#modes [data-mode=endless]').tap();
+    await expect(page.locator('#menu-best')).toHaveText('-');
     await page.locator('#modes [data-mode=zen]').tap();
     await expect(page.locator('#menu-best-row')).toBeHidden();
   });

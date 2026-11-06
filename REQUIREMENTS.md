@@ -51,6 +51,7 @@ Chosen on the menu; the last choice is remembered. Each mode keeps its own best 
 | Mode | Rules | Ends | Best |
 | --- | --- | --- | --- |
 | Marathon | Level up every 10 lines, guideline gravity curve | 150 lines (level 15) or top out | Score |
+| Endless | As Marathon with no line goal and no level cap (the score multiplier keeps growing). Gravity stops speeding up at level 20; from level 21 the lock delay shortens by 20 ms per level, from 500 ms down to 200 ms at level 35. | Top out | Score |
 | Sprint | Level 1 gravity throughout | 40 lines or top out | Time (only when 40 lines are cleared) |
 | Zen | No gravity (soft / hard drop still work); level 1 | Never: a top out clears the board and play continues | None |
 | Rising | As Marathon, plus a garbage row (one hole) rises from the bottom every 8 s at level 1, 0.5 s sooner per level, down to 2 s. A hole moves to another column 30% of the time. A piece the stack rises into is pushed up. | Top out, or blocks pushed off the top of the buffer | Score |

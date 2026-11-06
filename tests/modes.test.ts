@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { BUFFER_HEIGHT, Game, HEIGHT, WIDTH, boardFromRows, type ActivePiece } from '../src/game/game';
-import { MARATHON, MODES, RISING, SPRINT, ZEN, gravityMs, modeById, riseIntervalMs } from '../src/game/modes';
+import {
+  ENDLESS,
+  LOCK_DELAY_MS,
+  MARATHON,
+  MODES,
+  RISING,
+  SPRINT,
+  ZEN,
+  endlessLockDelayMs,
+  gravityMs,
+  modeById,
+  riseIntervalMs,
+} from '../src/game/modes';
 import { formatTime, hudStats, resultText } from '../src/hud';
 import { isBetter, loadRecord, resultValue, saveRecord } from '../src/records';
 import { seeded } from './helpers';
@@ -37,6 +49,44 @@ describe('marathon', () => {
     expect(game.status).toBe('complete');
     expect(game.lines).toBe(150);
     expect(game.level).toBe(15);
+  });
+});
+
+describe('endless', () => {
+  it('keeps playing past the Marathon goal and keeps levelling up', () => {
+    const game = new Game({ mode: ENDLESS, board: boardFromRows(quadRows), piece: quadI });
+    game.lines = 148;
+    game.hardDrop();
+    expect(game.status).toBe('playing');
+    expect(game.lines).toBe(152);
+    expect(game.level).toBe(16);
+    expect(ENDLESS.level(999)).toBe(100);
+  });
+
+  it('shortens the lock delay after level 20, down to 200 ms', () => {
+    expect(endlessLockDelayMs(1)).toBe(LOCK_DELAY_MS);
+    expect(endlessLockDelayMs(20)).toBe(LOCK_DELAY_MS);
+    expect(endlessLockDelayMs(21)).toBe(480);
+    expect(endlessLockDelayMs(35)).toBe(200);
+    expect(endlessLockDelayMs(100)).toBe(200);
+    for (const m of MODES) if (m !== ENDLESS) expect(m.lockDelay(100)).toBe(LOCK_DELAY_MS);
+  });
+
+  it('locks a grounded piece after the shorter delay at high levels', () => {
+    const game = new Game({ mode: ENDLESS, piece: { type: 'O', rot: 0, x: 3, y: B - 1 } });
+    game.level = 35;
+    game.update(199);
+    expect(game.pieceCount).toBe(1);
+    game.update(1);
+    expect(game.pieceCount).toBe(2);
+  });
+
+  it('records the score of an ended game', () => {
+    const game = new Game({ mode: ENDLESS });
+    game.score = 1234;
+    game.status = 'gameover';
+    expect(resultValue(game)).toBe(1234);
+    expect(resultText(game)).toEqual({ title: 'Game Over', label: 'Score', value: '1234' });
   });
 });
 
@@ -264,6 +314,7 @@ describe('hud', () => {
     expect(labels(SPRINT)).toEqual(['TIME', 'BEST', 'LINES', 'SCORE']);
     expect(labels(ZEN)).toEqual(['SCORE', 'LINES', 'TIME']);
     expect(labels(RISING)).toEqual(['SCORE', 'BEST', 'LEVEL', 'LINES']);
+    expect(labels(ENDLESS)).toEqual(['SCORE', 'BEST', 'LEVEL', 'LINES']);
     expect(hudStats(SPRINT, null, 61_230)).toContainEqual(['BEST', '1:01.23']);
     expect(hudStats(SPRINT, null, null)).toContainEqual(['LINES', '0/40']);
   });

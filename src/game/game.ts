@@ -3,7 +3,7 @@ import { getKicks, pieceCells, type Cell, type PieceType, type Rotation } from '
 import { MARATHON, gravityMs, type Mode } from './modes';
 import { scoreClear, type TSpin } from './scoring';
 
-export { gravityMs } from './modes';
+export { LOCK_DELAY_MS, gravityMs } from './modes';
 
 export const WIDTH = 10;
 export const VISIBLE_HEIGHT = 20;
@@ -11,7 +11,6 @@ export const VISIBLE_HEIGHT = 20;
 export const BUFFER_HEIGHT = 20;
 export const HEIGHT = VISIBLE_HEIGHT + BUFFER_HEIGHT;
 
-export const LOCK_DELAY_MS = 500;
 export const MAX_LOCK_RESETS = 15;
 export const QUEUE_SIZE = 6;
 /** Chance that a rising garbage row moves its hole to another column. */
@@ -293,7 +292,7 @@ export class Game {
         return;
       }
       this.lockTimer += dt;
-      if (this.lockTimer >= LOCK_DELAY_MS) this.lock();
+      if (this.lockTimer >= this.mode.lockDelay(this.level)) this.lock();
     }
   }
 
